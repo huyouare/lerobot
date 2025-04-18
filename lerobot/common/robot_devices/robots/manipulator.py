@@ -241,49 +241,59 @@ class ManipulatorRobot:
             print(f"Connecting {name} leader arm.")
             self.leader_arms[name].connect()
 
-        if self.robot_type in ["koch", "koch_bimanual", "aloha"]:
-            from lerobot.common.robot_devices.motors.dynamixel import TorqueMode
-        elif self.robot_type in ["so100", "moss", "lekiwi"]:
-            from lerobot.common.robot_devices.motors.feetech import TorqueMode
+        # Skip torque control for PiPER arm since it handles its own motion control
+        if self.robot_type != "piper":
+            if self.robot_type in ["koch", "koch_bimanual", "aloha"]:
+                from lerobot.common.robot_devices.motors.dynamixel import TorqueMode
+            elif self.robot_type in ["so100", "moss", "lekiwi"]:
+                from lerobot.common.robot_devices.motors.feetech import TorqueMode
 
-        # We assume that at connection time, arms are in a rest position, and torque can
-        # be safely disabled to run calibration and/or set robot preset configurations.
-        for name in self.follower_arms:
-            self.follower_arms[name].write("Torque_Enable", TorqueMode.DISABLED.value)
-        for name in self.leader_arms:
-            self.leader_arms[name].write("Torque_Enable", TorqueMode.DISABLED.value)
-
-        self.activate_calibration()
-
-        # Set robot preset (e.g. torque in leader gripper for Koch v1.1)
-        if self.robot_type in ["koch", "koch_bimanual"]:
-            self.set_koch_robot_preset()
-        elif self.robot_type == "aloha":
-            self.set_aloha_robot_preset()
-        elif self.robot_type in ["so100", "moss", "lekiwi"]:
-            self.set_so100_robot_preset()
-
-        # Enable torque on all motors of the follower arms
-        for name in self.follower_arms:
-            print(f"Activating torque on {name} follower arm.")
-            self.follower_arms[name].write("Torque_Enable", 1)
-
-        if self.config.gripper_open_degree is not None:
-            if self.robot_type not in ["koch", "koch_bimanual"]:
-                raise NotImplementedError(
-                    f"{self.robot_type} does not support position AND current control in the handle, which is require to set the gripper open."
-                )
-            # Set the leader arm in torque mode with the gripper motor set to an angle. This makes it possible
-            # to squeeze the gripper and have it spring back to an open position on its own.
+            # We assume that at connection time, arms are in a rest position, and torque can
+            # be safely disabled to run calibration and/or set robot preset configurations.
+            for name in self.follower_arms:
+                self.follower_arms[name].write("Torque_Enable", TorqueMode.DISABLED.value)
             for name in self.leader_arms:
-                self.leader_arms[name].write("Torque_Enable", 1, "gripper")
-                self.leader_arms[name].write("Goal_Position", self.config.gripper_open_degree, "gripper")
+                self.leader_arms[name].write("Torque_Enable", TorqueMode.DISABLED.value)
+
+            self.activate_calibration()
+
+            # Set robot preset (e.g. torque in leader gripper for Koch v1.1)
+            if self.robot_type in ["koch", "koch_bimanual"]:
+                self.set_koch_robot_preset()
+            elif self.robot_type == "aloha":
+                self.set_aloha_robot_preset()
+            elif self.robot_type in ["so100", "moss", "lekiwi"]:
+                self.set_so100_robot_preset()
+
+            # Enable torque on all motors of the follower arms
+            for name in self.follower_arms:
+                print(f"Activating torque on {name} follower arm.")
+                self.follower_arms[name].write("Torque_Enable", 1)
+
+            if self.config.gripper_open_degree is not None:
+                if self.robot_type not in ["koch", "koch_bimanual"]:
+                    raise NotImplementedError(
+                        f"{self.robot_type} does not support position AND current control in the handle, which is require to set the gripper open."
+                    )
+                # Set the leader arm in torque mode with the gripper motor set to an angle. This makes it possible
+                # to squeeze the gripper and have it spring back to an open position on its own.
+                for name in self.leader_arms:
+                    self.leader_arms[name].write("Torque_Enable", 1, "gripper")
+                    self.leader_arms[name].write("Goal_Position", self.config.gripper_open_degree, "gripper")
 
         # Check both arms can be read
         for name in self.follower_arms:
-            self.follower_arms[name].read("Present_Position")
+            if self.robot_type == "piper":
+                # For PiPER arm, read() doesn't take any arguments
+                self.follower_arms[name].read()
+            else:
+                self.follower_arms[name].read("Present_Position")
         for name in self.leader_arms:
-            self.leader_arms[name].read("Present_Position")
+            if self.robot_type == "piper":
+                # For PiPER arm, read() doesn't take any arguments
+                self.leader_arms[name].read()
+            else:
+                self.leader_arms[name].read("Present_Position")
 
         # Connect the cameras
         for name in self.cameras:

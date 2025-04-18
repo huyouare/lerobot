@@ -31,7 +31,12 @@ except ImportError:
 
 
 class PiperMotorsBus(MotorsBus):
-    """Motor bus implementation for the PiPER robotic arm using CAN interface."""
+    """Motor bus implementation for the PiPER robotic arm using CAN interface.
+    
+    Note: Before using the arm, you need to configure the CAN interface:
+        sudo ip link set can0 type can bitrate 1000000
+        sudo ip link set up can0
+    """
 
     def __init__(self, config: PiperMotorsBusConfig):
         self.config = config
@@ -45,7 +50,7 @@ class PiperMotorsBus(MotorsBus):
             raise ImportError("piper_control package not found. Install it to use the Piper arm.")
 
     def connect(self):
-        """Connect to the PiPER arm via CAN and initialize it."""
+        """Connect to the PiPER arm via CAN and enable motion control."""
         if self.is_connected:
             raise RobotDeviceAlreadyConnectedError(
                 f"PiPER arm is already connected. Do not call `motors_bus.connect()` twice."
@@ -64,23 +69,33 @@ class PiperMotorsBus(MotorsBus):
                 raise ImportError("piper_control package not found. Install it to use the Piper arm.")
             
             # Initialize the PiperControl interface for the given CAN port
+            print(f"Initializing PiPER control on {self.config.can_port}...")
             self._piper = piper_control.PiperControl(can_port=self.config.can_port)
-            # Reset the arm to enable motors and motion control
-            self._piper.reset()
+            
+            # Get current positions before enabling motion control
+            print("Getting current positions...")
+            current_positions = self._piper.get_joint_positions()
+            print(f"Current positions: {current_positions}")
+            
+            # Enable motion control
+            print("Enabling motion control...")
+            self._piper.enable()
+            print("Motion control enabled")
+            
+            # Set the arm back to its current position
+            print("Setting arm to current positions...")
+            self._piper.set_joint_positions(current_positions)
+            print("Arm position restored")
             
         self.is_connected = True
         print(f"Connected to PiPER on {self.config.can_port}")
 
     def disconnect(self):
-        """Disconnect or disable the PiPER arm."""
-        if self._piper:
-            try:
-                self._piper.disable()    # if PiperControl has a disable method
-            except AttributeError:
-                pass  # PiperControl may not have explicit disconnect; ignore
+        """Clean up the connection to the PiPER arm without disabling it."""
+        # Just clean up our connection state
         self.is_connected = False
         self._piper = None
-        print("PiPER arm disconnected.")
+        print("PiPER connection cleaned up.")
 
     def get_joint_positions(self):
         """Read all joint angles from the PiPER arm."""
@@ -176,6 +191,7 @@ class PiperMotorsBus(MotorsBus):
             )
             
         positions = self.get_joint_positions()
+        print(f"Read positions: {positions}")  # Debug print
         return {name: positions[self.motors[name][0] - 1] for name in self.motors.keys()}
 
     def write(self, positions: Dict[str, float]):
@@ -185,7 +201,16 @@ class PiperMotorsBus(MotorsBus):
                 f"PiPER arm not connected. You need to run `motors_bus.connect()`."
             )
             
-        self.set_joint_positions(positions)
+        # Convert positions dict to a list in the correct order
+        target_positions = [0.0] * len(self.motors)
+        for name, angle in positions.items():
+            idx = self.motors[name][0] - 1  # convert 1-indexed ID to 0-index
+            target_positions[idx] = angle
+            
+        # Send the position command
+        print(f"Sending positions to arm: {target_positions}")  # Debug print
+        self._piper.set_joint_positions(target_positions)
+        print("Positions sent")  # Debug print
 
     def __del__(self):
         if getattr(self, "is_connected", False):

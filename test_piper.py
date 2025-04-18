@@ -1,27 +1,44 @@
+import time
 from lerobot.common.robot_devices.robots.utils import make_robot
 
-# Create a Piper robot instance
-robot = make_robot("piper")
+def main():
+    # Create robot instance using the type name
+    robot = make_robot("piper")
+    
+    # Connect to the arm
+    print("Connecting to robot...")
+    robot.connect()
+    
+    # Get current positions
+    current_positions = robot.follower_arms["main"].read()
+    print(f"Current joint positions: {current_positions}")
+    
+    # Move each joint slightly (5 degrees = ~0.087 radians)
+    small_movement = 0.087
+    for joint_name in current_positions.keys():
+        print(f"\nMoving {joint_name} slightly...")
+        # Get current position
+        current_pos = current_positions[joint_name]
+        print(f"Current position: {current_pos}")
+        # Move slightly
+        target_pos = current_pos + small_movement
+        print(f"Target position: {target_pos}")
+        robot.follower_arms["main"].write({joint_name: target_pos})
+        # Wait a bit
+        time.sleep(1.0)
+        # Get new position
+        new_positions = robot.follower_arms["main"].read()
+        print(f"New position: {new_positions[joint_name]}")
+        # Move back
+        robot.follower_arms["main"].write({joint_name: current_pos})
+        time.sleep(1.0)
+        # Get final position
+        final_positions = robot.follower_arms["main"].read()
+        print(f"Final position: {final_positions[joint_name]}")
+    
+    # Clean up
+    print("\nDisconnecting...")
+    robot.disconnect()
 
-# Connect to the arm
-robot.follower_arms["main"].connect()
-
-try:
-    # Get current joint positions
-    positions = robot.follower_arms["main"].get_joint_positions()
-    print("Current joint positions:", positions)
-    
-    # Move a single joint (e.g., elbow)
-    robot.follower_arms["main"].set_joint_position("elbow", positions[2] + 0.1)  # Move elbow up by 0.1 rad
-    
-    # Wait a bit
-    import time
-    time.sleep(2)
-    
-    # Move all joints to a new position
-    new_positions = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]  # All joints at 0 radians
-    robot.follower_arms["main"].set_joint_positions(new_positions)
-    
-finally:
-    # Always disconnect when done
-    robot.follower_arms["main"].disconnect()
+if __name__ == "__main__":
+    main()
