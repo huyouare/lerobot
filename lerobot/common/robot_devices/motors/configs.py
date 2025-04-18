@@ -54,6 +54,6 @@ class PiperMotorsBusConfig(MotorsBusConfig):
         "wrist_pitch": (4, "piper_joint"),
         "wrist_yaw":   (5, "piper_joint"),
         "wrist_roll":  (6, "piper_joint"),
-        # "gripper": (7, "piper_gripper")  # if a gripper is attached, optional
+        "gripper": (7, "piper_gripper")  # gripper joint
     })
     mock: bool = False  # allow simulation mode if needed

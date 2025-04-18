@@ -20,8 +20,13 @@ def main():
         # Get current position
         current_pos = current_positions[joint_name]
         print(f"Current position: {current_pos}")
-        # Move slightly
-        target_pos = current_pos + small_movement
+        
+        # For elbow, move up instead of down since it's currently folded
+        if joint_name == "elbow":
+            target_pos = current_pos - small_movement  # Move up
+        else:
+            target_pos = current_pos + small_movement  # Move in default direction
+            
         print(f"Target position: {target_pos}")
         robot.follower_arms["main"].write({joint_name: target_pos})
         # Wait a bit
@@ -35,6 +40,20 @@ def main():
         # Get final position
         final_positions = robot.follower_arms["main"].read()
         print(f"Final position: {final_positions[joint_name]}")
+    
+    # Test gripper if available
+    try:
+        print("\nTesting gripper...")
+        # Open gripper
+        print("Opening gripper...")
+        robot.follower_arms["main"].open_gripper(1.0)
+        time.sleep(1.0)
+        # Close gripper
+        print("Closing gripper...")
+        robot.follower_arms["main"].open_gripper(0.0)
+        time.sleep(1.0)
+    except Exception as e:
+        print(f"Gripper test skipped: {e}")
     
     # Clean up
     print("\nDisconnecting...")

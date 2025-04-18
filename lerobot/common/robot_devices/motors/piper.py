@@ -160,10 +160,28 @@ class PiperMotorsBus(MotorsBus):
             )
             
         try:
-            # Assume PiperControl has a method to control gripper
-            self._piper.set_gripper(value)  
-        except AttributeError:
-            print("Gripper control not supported by PiperControl or no gripper present.")
+            # Check if gripper is configured
+            if "gripper" not in self.motors:
+                print("No gripper configured in motors list")
+                return
+                
+            # Get current gripper state (position, effort)
+            current_pos, current_effort = self._piper.get_gripper_state()
+            print(f"Current gripper state: position={current_pos}, effort={current_effort}")
+            
+            # Calculate target position using GRIPPER_ANGLE_MAX
+            target_pos = piper_control.GRIPPER_ANGLE_MAX * value
+            
+            # Set the gripper position with effort
+            print(f"Setting gripper position to {target_pos} (value={value})")
+            self._piper.set_gripper_ctrl(
+                position=target_pos,
+                effort=piper_control.GRIPPER_EFFORT_MAX * 0.5  # 50% of max effort
+            )
+            
+        except Exception as e:
+            print(f"Error controlling gripper: {e}")
+            traceback.print_exc()
 
     def motor_names(self) -> List[str]:
         return list(self.motors.keys())
@@ -192,7 +210,28 @@ class PiperMotorsBus(MotorsBus):
             
         positions = self.get_joint_positions()
         print(f"Read positions: {positions}")  # Debug print
-        return {name: positions[self.motors[name][0] - 1] for name in self.motors.keys()}
+        
+        # Create result dictionary
+        result = {}
+        
+        # Handle main joints (first 6 positions)
+        for name, (idx, _) in self.motors.items():
+            if name == "gripper":
+                # Skip gripper for now, we'll handle it separately
+                continue
+            if idx - 1 < len(positions):
+                result[name] = positions[idx - 1]
+            else:
+                print(f"Warning: Position for {name} not available")
+                result[name] = 0.0
+                
+        # Handle gripper separately if configured
+        if "gripper" in self.motors:
+            # For now, return 0.0 for gripper position
+            # TODO: Implement proper gripper position reading when available
+            result["gripper"] = 0.0
+            
+        return result
 
     def write(self, positions: Dict[str, float]):
         """Write target positions to the motors."""
@@ -201,16 +240,28 @@ class PiperMotorsBus(MotorsBus):
                 f"PiPER arm not connected. You need to run `motors_bus.connect()`."
             )
             
-        # Convert positions dict to a list in the correct order
-        target_positions = [0.0] * len(self.motors)
+        # Get current positions
+        current_positions = self._piper.get_joint_positions()
+        
+        # Update positions for main joints (first 6)
         for name, angle in positions.items():
+            if name == "gripper":
+                # Skip gripper for now, we'll handle it separately
+                continue
             idx = self.motors[name][0] - 1  # convert 1-indexed ID to 0-index
-            target_positions[idx] = angle
+            if idx < len(current_positions):
+                current_positions[idx] = angle
+            else:
+                print(f"Warning: Cannot set position for {name}, index out of range")
             
-        # Send the position command
-        print(f"Sending positions to arm: {target_positions}")  # Debug print
-        self._piper.set_joint_positions(target_positions)
+        # Send the position command for main joints
+        print(f"Sending positions to arm: {current_positions}")  # Debug print
+        self._piper.set_joint_positions(current_positions)
         print("Positions sent")  # Debug print
+        
+        # Handle gripper separately if needed
+        if "gripper" in positions:
+            print(f"Warning: Gripper position control not yet implemented")
 
     def __del__(self):
         if getattr(self, "is_connected", False):
