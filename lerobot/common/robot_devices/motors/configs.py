@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import abc
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import draccus
 
@@ -39,3 +39,21 @@ class FeetechMotorsBusConfig(MotorsBusConfig):
     port: str
     motors: dict[str, tuple[int, str]]
     mock: bool = False
+
+
+@MotorsBusConfig.register_subclass("piper")
+@dataclass
+class PiperMotorsBusConfig(MotorsBusConfig):
+    """Configuration for the PiPER arm's motor bus (CAN interface)."""
+    can_port: str = "can0"  # default CAN interface name for PiPER
+    # Map joint names to an identifier (we use index numbers as IDs for PiPER joints):
+    motors: dict[str, tuple[int, str]] = field(default_factory=lambda: {
+        "base":    (1, "piper_joint"),
+        "shoulder":(2, "piper_joint"),
+        "elbow":   (3, "piper_joint"),
+        "wrist_pitch": (4, "piper_joint"),
+        "wrist_yaw":   (5, "piper_joint"),
+        "wrist_roll":  (6, "piper_joint"),
+        # "gripper": (7, "piper_gripper")  # if a gripper is attached, optional
+    })
+    mock: bool = False  # allow simulation mode if needed

@@ -27,6 +27,7 @@ from lerobot.common.robot_devices.motors.configs import (
     DynamixelMotorsBusConfig,
     FeetechMotorsBusConfig,
     MotorsBusConfig,
+    PiperMotorsBusConfig,
 )
 
 
@@ -610,4 +611,21 @@ class LeKiwiRobotConfig(RobotConfig):
         }
     )
 
+    mock: bool = False
+
+
+@RobotConfig.register_subclass("piper")
+@dataclass
+class PiperRobotConfig(ManipulatorRobotConfig):
+    """RobotConfig for a single PiPER robotic arm."""
+    # Optionally, you can set a calibration directory or safety limits here.
+    # For example, limit max movement per command to 5 degrees:
+    calibration_dir: str = ".cache/calibration/piper"
+    max_relative_target: int | None = None  # (set to e.g. 5 if needed)
+    # Define the arms. PiPER is a single 6-DoF arm, so we use one entry in follower_arms.
+    leader_arms: dict[str, MotorsBusConfig] = field(default_factory=lambda: {})
+    follower_arms: dict[str, MotorsBusConfig] = field(default_factory=lambda: {
+        "main": PiperMotorsBusConfig()
+    })
+    cameras: dict[str, CameraConfig] = field(default_factory=lambda: {})
     mock: bool = False
